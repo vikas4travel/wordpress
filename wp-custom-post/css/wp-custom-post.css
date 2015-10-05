@@ -1,0 +1,21 @@
+.wp_custom_post ul, .wp_custom_post li {
+	list-style:none;
+	padding:10px;
+	background-color:#fafafa;
+	font-size:12px;
+}
+
+.wp_custom_post ul a, .wp_custom_post li a{
+	color:#0088cc;
+}
+
+.wp_custom_post ul span, .wp_custom_post li span{
+	font-size:10px;
+	padding-left:5px;
+}
+
+.wp_custom_post {
+	border:1px solid #aaa;
+	
+}
+

@@ -1,0 +1,29 @@
+.wp_comments_widget ul, .wp_comments_widget li {
+	list-style:none;
+	padding:10px;
+	background-color:#fafafa;
+	font-size:12px;
+}
+
+.wp_comments_widget ul a, .wp_comments_widget li a{
+	color:#0088cc;
+}
+
+.wp_comments_widget ul span, .wp_comments_widget li span{
+	font-size:10px;
+}
+
+.wp_comments_widget {
+	border:1px solid #aaa;
+	
+}
+
+.comments-widget-comment, .comments-widget-comment p {
+	font-size: 12px;
+	color:rgba(51, 51, 51, 0.7);
+	padding:10px;
+}
+
+.comments-widget-comment p {
+	font-size:10px;
+}

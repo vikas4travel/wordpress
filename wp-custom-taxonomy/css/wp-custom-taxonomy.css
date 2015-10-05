@@ -1,0 +1,21 @@
+.wp_custom_taxonomy_widget ul, .wp_custom_taxonomy_widget li {
+	list-style:none;
+	padding:10px;
+	background-color:#fafafa;
+	font-size:12px;
+}
+
+.wp_custom_taxonomy_widget ul a, .wp_custom_taxonomy_widget li a{
+	color:#0088cc;
+}
+
+.wp_custom_taxonomy_widget ul span, .wp_custom_taxonomy_widget li span{
+	font-size:10px;
+	padding-left:5px;
+}
+
+.wp_custom_taxonomy_widget {
+	border:1px solid #aaa;
+	
+}
+
