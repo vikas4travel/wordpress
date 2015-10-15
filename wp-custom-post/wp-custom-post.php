@@ -32,8 +32,11 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 
 
 /**
- * Register our custom post type.
- */
+* Register our custom post type.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function register_custom_post() {
 	$labels = array(
 		'name'               => _x( 'Custom Posts', 'custom posts', 'wp-custom-post' ),
@@ -74,8 +77,11 @@ add_action( 'init', 'register_custom_post' );
 
 
 /**
- * Install custom post type.
- */
+* Install custom post type.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function custom_post_install() {
 	
     // Trigger our function that registers the custom post type
@@ -89,8 +95,11 @@ register_activation_hook( __FILE__, 'custom_post_install' );
 
 
 /**
- * Uninstall custom post type.
- */
+* Uninstall custom post type.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function custom_post_deactivation() {
  	
     // Our post type will be automatically removed, so no need to unregister it
@@ -103,30 +112,35 @@ register_deactivation_hook( __FILE__, 'custom_post_deactivation' );
 
 
 
-
-function filter_where($where = '') {
-	//posts in last 30 days
-	$where .= " AND post_date > '" . date('Y-m-d', strtotime('-30 days')) . "'";
-	return $where;
-}
-
 /**
  * Class for custom widget.
  * A widget which show up to 5 most recent posts, maximum of 30 days old, for posts of that custom post type
  * Display the post title, post featured image thumbnail, and author name. The post title and image should link to the post.
  * If placed in a post's sidebar, make sure the current post is not included in the list
+ *
+ * @since 2015-10-15.
+ * @version 2015-10-15 Vikas Sharma - PMCVIP-242
  */
 
 class wp_custom_widget extends WP_Widget {
 	function __construct() {
 		parent::__construct(
 			'wp_custom_widget', //Base ID
-			__('WP Custom Widget', 'wp_custom_widget'), // Widget Name
+			__('WP Custom Post Type Widget', 'wp_custom_widget'), // Widget Name
 			array('description' => __('Custom widget to show up to 5 most recent posts', 'wp_custom_widget'))); // Widget description
 	}
 	
-	// Creating widget front-end
+	/**
+	* Creating widget front-end
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
 	public function widget($args, $instance) {
+		
+		global $post;
+		
+		$currentID	=	(is_single()) ? get_the_ID() : 0;
 		
 		$title = apply_filters('widget_title', $instance['title']);
 		
@@ -137,21 +151,27 @@ class wp_custom_widget extends WP_Widget {
 			echo $args['before_title'] . $title . $args['after_title'];
 		}	
 		
-		global $post;
+		$query_args = array (
+			'posts_per_page' => 5,
+			'post_type'		 => 'wp-custom-post',
+			'post__not_in'	 => array($currentID),
+			'post_status'	 => 'publish',
+			'orderby'		 => 'date',
+			'order'			 => 'DESC',
+			'date_query' => array(
+				array(
+					'column' => 'post_date_gmt',
+					'after' => '1 month ago'
+				)
+			)
+		);
 
-		
-		
-		$query_args =  array( 
-			'posts_per_page'=> '5', 
-			'post_type'		=> 'wp-custom-post',
-			'post__not_in'	=> array(get_the_ID()),
-			'orderby'		=> 'date',
-			'order'			=> 'DESC'
-		); 
-		
-		add_filter('posts_where', 'filter_where');
-		
-		$listings = new WP_Query($query_args);
+		$listings = get_transient('wp_custom_post'.$currentID);
+		if ($listings === false) {
+			
+			$listings = new WP_Query( $query_args );
+			set_transient('wp_custom_post'.$currentID, $listings, 60);
+		}
 		
 		add_image_size( 'custom-size', 300, 187, false );
 		
@@ -179,7 +199,12 @@ class wp_custom_widget extends WP_Widget {
 		echo $args['after_widget'];
 	}
     
-	// Widget Backend 
+	/**
+	* Creating Widget Backend 
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
 	public function form($instance) {
 		
 		if (isset($instance['title'])) {
@@ -197,28 +222,46 @@ class wp_custom_widget extends WP_Widget {
 		<?php
 	}
     
-    // Updating widget replacing old instances with new
+	/**
+	* Updating widget replacing old instances with new
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
     public function update($new_instance, $old_instance)
     {
         $instance          = array();
-        $instance['title'] = (!empty($new_instance['title'])) ? strip_tags($new_instance['title']) : '';
+        $instance['title'] = (!empty($new_instance['title'])) ? sanitize_text_field($new_instance['title']) : '';
         return $instance;
     }
 } // Class wp_custom_widget ends here
+ 
 
-
-// Register and load the widget
+/**
+* Register and load the widget
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function load_wp_custom_widget() {
     register_widget('wp_custom_widget');
 }
 add_action('widgets_init', 'load_wp_custom_widget');
 
-// Enqueue our stylesheet.
-function wp_custom_post_css() {
-	wp_enqueue_style( 'wp-custom-post', plugins_url('/css/wp-custom-post.css', __FILE__), false, '1.0.0', 'all');
-}
 
-add_action( 'wp_enqueue_scripts', 'wp_custom_post_css' );
+/**
+* Enqueue our stylesheet
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
+function wp_custom_post_css() {
+	
+	wp_register_style( 'wp-custom-post', plugins_url( '/css/wp-custom-post.css', __FILE__ ) );
+	wp_enqueue_style( 'wp-custom-post' );
+}
+ 
+add_action( 'wp_enqueue_scripts', 'wp_custom_post_css' ); 
 
 
 

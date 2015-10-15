@@ -31,19 +31,15 @@ Text Domain: wp-comments-widget
 defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 
 
-
-function filter_comments_where($where = '') {
-	//posts in last 30 days
-	$where .= " AND post_date > '" . date('Y-m-d', strtotime('-30 days')) . "'";
-	return $where;
-}
-
 /**
  * Class for custom widget.
  * A widget which shows up to 1 post with the highest comment count by the selected author AND up to 1 most recent comment by the same author AND the author's gravatar.
  * Display the post title, post featured image thumbnail, and author name. The post title and image should link to the post. For the comment, include the first 200 characters of the comment and link the text to the comment.
  * If the Co-Authors Plus plugin is enabled, and the author has a Guest Author profile, the widget should pull the author's name and image from their Guest Author profile
  * If placed in a post's sidebar, make sure the current post is not included in the list (but comments from the current post are OK)
+ *
+ * @since 2015-10-15.
+ * @version 2015-10-15 Vikas Sharma - PMCVIP-242
  */
 
 class wp_comments_widget extends WP_Widget {
@@ -55,8 +51,18 @@ class wp_comments_widget extends WP_Widget {
 			array('description' => __('Comments widget to show up to 1 post with the highest comment count', 'wp_comments_widget'))); // Widget description
 	}
 	
-	// Creating widget front-end
+
+	/**
+	* Creating widget front-end
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
 	public function widget($args, $instance) {
+		
+		global $post;
+		
+		$currentID	=	(is_single()) ? get_the_ID() : 0;
 		
 		$title = apply_filters('widget_title', $instance['title']);
 		
@@ -67,14 +73,12 @@ class wp_comments_widget extends WP_Widget {
 			echo $args['before_title'] . $title . $args['after_title'];
 		}	
 		
-		global $post;
-		
 		if(is_numeric($instance['author'])) {
 		
 			$query_args	=	array(
 				'author' 		=> $instance['author'],
 				'posts_per_page'=> 1,
-				'post__not_in'	=> array(get_the_ID()),
+				'post__not_in'	=> array($currentID),
 				'orderby' 		=> 'comment_count',
 				'order'   		=> 'DESC'
 			);
@@ -83,14 +87,20 @@ class wp_comments_widget extends WP_Widget {
 			$query_args	=	array(
 				'author_name' 	=> $instance['author'],
 				'posts_per_page'=> 1,
-				'post__not_in'	=> array(get_the_ID()),
+				'post__not_in'	=> array($currentID),
 				'orderby' 		=> 'comment_count',
 				'order'   		=> 'DESC'
 			);
 			
 		}
 		
-		$listings = new WP_Query($query_args);
+		$listings = get_transient('wp_comments_widget'.$currentID);
+		if ($listings === false) {
+		
+			$listings = new WP_Query( $query_args );
+			set_transient('wp_comments_widget'.$currentID, $listings, 60);
+		}
+		
 		
 		// Thumb. image size.
 		add_image_size( 'custom-size', 300, 187, false );
@@ -120,18 +130,45 @@ class wp_comments_widget extends WP_Widget {
 		echo $args['after_widget'];
 	}
     
-	// Get Latest Post and comment by same author. 
+	/**
+	* Get Latest Post and comment by same author. 
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
 	public function getComments($author_id, $post_id) {
 		
-		$args = array(
-			'number' => 1,
-			'post_id' => $post_id,
-			'user_id' => $author_id,
-			'status' => 'approve',
-			'orderby' => 'comment_date',
-			'order'   => 'DESC'
+		if( ! is_numeric( $author_id ) ) {
 			
-		);
+			// if a guest author is selected in admin area, $author_id will contain author's name. 
+			// find coauthor details
+			$coauthors 		= get_coauthors( $post_id );
+			$coauthor_email = $coauthors[0]->user_email;
+			$author_avatar  = get_avatar( $coauthor_email, 32 );
+			$coauthor_name  = $coauthors[0]->display_name;
+			
+			$args = array(
+				'number' => 1,
+				'post_id' => $post_id,
+				'author_name' => $author_id,
+				'status' => 'approve',
+				'orderby' => 'comment_date',
+				'order'   => 'DESC'
+				
+			);
+			
+		} else {
+			$author_avatar = get_avatar( $author_id, 32 );
+			
+			$args = array(
+				'number' => 1,
+				'post_id' => $post_id,
+				'user_id' => $author_id,
+				'status' => 'approve',
+				'orderby' => 'comment_date',
+				'order'   => 'DESC'
+			);
+		}
 		
 		$latest_comment = get_comments( $args );
 		
@@ -141,22 +178,30 @@ class wp_comments_widget extends WP_Widget {
 			
 			$date = strtotime($comment->comment_date);
 			$date = date('M d, Y');
-
+			
 			$comment = $comment->comment_content;
 			if( strlen( $comment ) >200 ) $comment = substr( $comment, 0, 200 )."...";
 			
 			
-			$comment_html .= 'latest comment: <br />&nbsp;&nbsp; by: ' . $comment->comment_author
-							
-							.'&nbsp;'. get_avatar( $author_id, 32 )
-
-						    .'<p> <a href="' .get_comments_link( $post_id ) .'"> '. $comment .'</a></p>';
+			if( isset( $coauthor_name ) && $coauthor_name ) {
+				$author_name = $coauthor_name;
+			} else {
+				$author_name = $comment->comment_author;
+			}	
+			
+			$comment_html .= 'latest comment: <br />&nbsp;&nbsp; by: ' .$author_name .'&nbsp;'. $author_avatar
+						  . '<p> <a href="' .get_comments_link( $post_id ) .'"> '. $comment .'</a></p>';
 		}
 		return $comment_html;
 	}
 		
 	
-	// Widget Backend 
+	/**
+	* Widget Backend 
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
 	public function form($instance) {
 		
 		
@@ -223,28 +268,45 @@ class wp_comments_widget extends WP_Widget {
 	}
 	
     
-    // Updating widget replacing old instances with new
+	/**
+	* Updating widget replacing old instances with new
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
     public function update($new_instance, $old_instance)
     {
         $instance          = array();
-        $instance['title'] = (!empty($new_instance['title'])) ? strip_tags($new_instance['title']) : '';
-        $instance['author'] = (!empty($new_instance['author'])) ? strip_tags($new_instance['author']) : '';
+        $instance['title'] = (!empty($new_instance['title'])) ? sanitize_text_field($new_instance['title']) : '';
+        $instance['author'] = (!empty($new_instance['author'])) ? sanitize_text_field($new_instance['author']) : ''; 
 		return $instance;
-    }
-} // Class wp_custom_widget ends here
+    } 
+} // Class wp_comments_widget ends here
 
 
-// Register and load the widget
+/**
+* Register and load the widget
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function load_wp_comments_widget() {
     register_widget('wp_comments_widget');
 }
-add_action('widgets_init', 'load_wp_comments_widget');
+add_action('widgets_init', 'load_wp_comments_widget'); 
 
 
 
-// Enqueue our stylesheet.
+/**
+* Enqueue our stylesheet.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function wp_comments_widget_css() {
-	wp_enqueue_style( 'wp-comments-widget', plugins_url('/css/wp-comments-widget.css', __FILE__), false, '1.0.0', 'all');
+	
+	wp_register_style( 'wp-comments-widget', plugins_url( '/css/wp-comments-widget.css', __FILE__) );
+	wp_enqueue_style( 'wp-comments-widget' );
 }
 
 add_action( 'wp_enqueue_scripts', 'wp_comments_widget_css' );

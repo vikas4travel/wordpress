@@ -32,8 +32,11 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 
 
 /**
- * Register our custom taxonomy.
- */
+* Register our custom taxonomy.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function register_custom_taxonomy() {
 	$labels = array(
 		'name'              => _x( 'Custom Taxonomy', 'Custom Taxonomy' ),
@@ -65,8 +68,11 @@ add_action( 'init', 'register_custom_taxonomy' );
 
 
 /**
- * Install custom taxonomy widget.
- */
+* Install custom taxonomy widget.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function custom_taxonomy_install() {
 	
     // Trigger our function that registers the taxonomy
@@ -80,8 +86,11 @@ register_activation_hook( __FILE__, 'custom_taxonomy_install' );
 
 
 /**
- * Uninstall custom taxonomy plugin.
- */
+* Uninstall custom taxonomy plugin.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function custom_taxonomy_deactivation() {
  	
     // Our taxonomy will be automatically removed, so no need to unregister it
@@ -95,11 +104,6 @@ register_deactivation_hook( __FILE__, 'custom_taxonomy_deactivation' );
 
 
 
-function filter_taxonomy_where($where = '') {
-	//posts in last 30 days
-	$where .= " AND post_date > '" . date('Y-m-d', strtotime('-30 days')) . "'";
-	return $where;
-}
 
 /**
  * Class for custom taxonomy.
@@ -107,8 +111,10 @@ function filter_taxonomy_where($where = '') {
  * An widget which show up to 5 most recent posts, maximum of 30 days old, for posts with any associated term in that taxonomy
  * Display the post title, post featured image thumbnail, and author name. The post title and image should link to the post.
  * If placed in a post's sidebar, make sure the current post is not included in the list
+ *
+ * @since 2015-10-15.
+ * @version 2015-10-15 Vikas Sharma - PMCVIP-242
  */
-
 class wp_custom_taxonomy_widget extends WP_Widget {
 	function __construct() {
 		parent::__construct(
@@ -117,9 +123,18 @@ class wp_custom_taxonomy_widget extends WP_Widget {
 			array('description' => __('Custom Taxonomy widget to show up to 5 most recent posts', 'wp_custom_taxonomy_widget'))); // Widget description
 	}
 	
-	// Creating widget front-end
+	/**
+	* Creating widget front-end
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
 	public function widget($args, $instance) {
 
+		global $post;
+		
+		$currentID	=	(is_single()) ? get_the_ID() : 0;
+		
 		$title = apply_filters('widget_title', $instance['title']);
 		
 		// before and after widget arguments are defined by themes
@@ -129,26 +144,42 @@ class wp_custom_taxonomy_widget extends WP_Widget {
 			echo $args['before_title'] . $title . $args['after_title'];
 		}	
 		
-		global $post;
-
+		// Get all terms for 'custom-taxonomy'
+		$term_ids = array();
+		$terms = get_terms( 'custom-taxonomy' );
+		foreach ( $terms as $term ) {
+			$term_ids[] = $term->term_id;
+		}		
 		
 		
-		add_filter('posts_where', 'filter_taxonomy_where');
-		
-		$query_args =  array( 
-			'posts_per_page'=> '5', 
-			'post__not_in'	=> array(get_the_ID()),
-			'orderby'		=> 'date',
-			'order'			=> 'DESC',
+		$query_args = array (
+			'posts_per_page' => 5,
+			'post__not_in'	 => array($currentID),
+			'post_status'	 => 'publish',
+			'orderby'		 => 'date',
+			'order'			 => 'DESC',
 			'tax_query' => array(
 				array(
 					'taxonomy' => 'custom-taxonomy',
-					'field' => 'slug',
-					'terms' => 't1',
+					'field' => 'id',
+					'terms' => $term_ids
 				)
-			)			
-		); 
-		$listings = new WP_Query($query_args);
+			),
+			'date_query' => array(
+				array(
+					'column' => 'post_date_gmt',
+					'after' => '1 month ago'
+				)
+			)
+		);
+
+		$listings = get_transient('wp_custom_taxonomy'.$currentID);
+		if ($listings === false) {
+		
+			$listings = new WP_Query( $query_args );
+			set_transient('wp_custom_taxonomy'.$currentID, $listings, 60);
+		}
+		
 		
 		add_image_size( 'custom-size', 300, 187, false );
 		
@@ -180,7 +211,12 @@ class wp_custom_taxonomy_widget extends WP_Widget {
 	}
     
 
-	// Widget Backend 
+	/**
+	* Creating widget back-end
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
 	public function form($instance) {
 		
 		if (isset($instance['title'])) {
@@ -198,26 +234,45 @@ class wp_custom_taxonomy_widget extends WP_Widget {
 		<?php
 	}
     
-    // Updating widget replacing old instances with new
+	/**
+	* Updating widget replacing old instances with new
+	*
+	* @since 2015-10-15.
+	* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+	*/
     public function update($new_instance, $old_instance)
     {
         $instance          = array();
-        $instance['title'] = (!empty($new_instance['title'])) ? strip_tags($new_instance['title']) : '';
+        $instance['title'] = (!empty($new_instance['title'])) ? sanitize_text_field($new_instance['title']) : '';
         return $instance;
-    }
+    } 
 } // Class wp_custom_widget ends here
 
 
-// Register and load the widget
+/**
+* Register and load the widget
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function load_wp_custom_taxonomy_widget() {
     register_widget('wp_custom_taxonomy_widget');
 }
 add_action('widgets_init', 'load_wp_custom_taxonomy_widget');
 
 
-// Enqueue our stylesheet.
+/**
+* Enqueue our stylesheet.
+*
+* @since 2015-10-15.
+* @version 2015-10-15 Vikas Sharma - PMCVIP-242
+*/
 function wp_custom_taxonomy_css() {
-	wp_enqueue_style( 'wp-custom-taxonomy', plugins_url('/css/wp-custom-taxonomy.css', __FILE__), false, '1.0.0', 'all');
+	
+	wp_register_style( 'wp-custom-taxonomy', plugins_url( '/css/wp-custom-taxonomy.css', __FILE__) );
+	wp_enqueue_style( 'wp-custom-taxonomy' );
+	
+	//wp_enqueue_style( 'wp-custom-taxonomy', plugins_url('/css/wp-custom-taxonomy.css', __FILE__), false, '1.0.0', 'all');
 }
 
 add_action( 'wp_enqueue_scripts', 'wp_custom_taxonomy_css' );
